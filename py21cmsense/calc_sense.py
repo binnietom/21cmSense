@@ -8,10 +8,11 @@ from __future__ import print_function
 from builtins import zip
 
 import numpy as np
+import tqdm
 from scipy import interpolate
 
 from . import conversions as conv
-import tqdm
+
 
 # You can change this to have any model you want, as long as mk, mpk and p21 are returned
 
@@ -64,7 +65,7 @@ def calculate_sensitivity_2d(uv_coverage, freq, p21, n_per_day,
                              n_channels, bandwidth,
                              n_days=1, horizon_buffer=0.1, foreground_model='moderate', no_ns_baselines=False,
                              report=False):
-    n_lstbins = n_per_day * 60.0/ obs_duration
+    n_lstbins = n_per_day * 60.0 / obs_duration
 
     mink = p21.x.min()
     maxk = p21.x.max()
@@ -80,7 +81,6 @@ def calculate_sensitivity_2d(uv_coverage, freq, p21, n_per_day,
 
     z = conv.f2z(freq)
     kpls = conv.dk_deta(z) * np.fft.fftfreq(n_channels, bandwidth / n_channels)
-
 
     # set up blank arrays/dictionaries
     kprs = []
@@ -100,7 +100,8 @@ def calculate_sensitivity_2d(uv_coverage, freq, p21, n_per_day,
 
     # loop over uv_coverage to calculate k_pr
     nonzero = np.where(uv_coverage > 0)
-    for iu, iv in tqdm.tqdm(zip(nonzero[1], nonzero[0]), desc="calculating 2D sensitivity", unit='uv-bins', disable=not report):
+    for iu, iv in tqdm.tqdm(zip(nonzero[1], nonzero[0]), desc="calculating 2D sensitivity", unit='uv-bins',
+                            disable=not report):
         u, v = (
             (iu - SIZE // 2) * dish_size_in_lambda,
             (iv - SIZE // 2) * dish_size_in_lambda,

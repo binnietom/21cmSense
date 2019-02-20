@@ -15,6 +15,10 @@ from . import array_definition as arrdef
 from . import conversions as conv
 import tqdm
 
+import pyuvsim
+import pyuvdata
+from astropy import constants as cnst
+from astropy.time import Time
 
 def beamgridder(xcen, ycen, size):
     cen = size // 2 - 0.5  # correction for centering
@@ -71,6 +75,62 @@ def get_redundant_baselines(aa, bl_max, bl_min, obs_zen, ref_fq, report=False):
             )
 
     return bl_len_max, bl_len_min, uvbins
+
+
+def get_redundant_baselines(uvd, tol=0.1):
+    return uvd.get_baseline_redundancies(tol)
+
+def grid_baselines(uvd, dish_size_in_lambda, u_min, u_max, redundancy_tol=0.1, drift=True):
+    if not drift:
+        raise NotImplementedError()
+
+    # First get the redundancies
+    groups, vectors, lengths, conj_ind= uvd.get_baseline_redundancies(redundancy_tol)
+
+    # vectors and lengths are in meters. Let's change it to wavelengths at
+    # ref. frequency.
+    vectors *= np.mean(uvd.freq_array) / cnst.c
+    lengths *= np.mean(uvd.freq_array) / cnst.c
+
+    dim = int(np.round(u_max / dish_size_in_lambda) * 2 + 1)
+    uvsum, quadsum = (
+        np.zeros((dim, dim)),
+        np.zeros((dim, dim)),
+    )  # quadsum adds all non-instantaneously-redundant baselines incoherently
+
+    for group, (u, v, w), length in zip(groups, vectors, lengths):
+        if u_min < length <= u_max:
+            for t in uvd.time_array(group[0]):
+                uvd.phase_time(Time(t, format='jd'))
+
+
+            _beam = beamgridder(
+                xcen=u / dish_size_in_lambda,
+                ycen=v / dish_size_in_lambda,
+                size=dim,
+            )
+
+            uvplane += nbls * _beam
+            uvsum += nbls * _beam
+        quadsum += (uvplane) ** 2
+        quadsum = quadsum ** 0.5
+
+    # Go through each u,v baseline in the array
+    for bl_idx, (u,v, w) in zip(uvd.baseline_array, uvd.uvw_array):
+        umag = np.sqrt(u ** 2 + v ** 2)
+
+        # Ensure we're inside the UV-plane limits imposed by the user.
+        if not (umag > u_max or umag < u_min):
+
+            # TODO: this is a *bad* way to histogram UV cells.
+            uvbin = (conv.trunc(u[0, 0]), conv.trunc(v[0, 0]))
+
+            if uvbin not in uvbins:
+                uvbins[uvbin] = [bl_idx]
+            else:
+                uvbins[uvbin].append(bl_idx)
+
+    return uvbins
 
 
 def grid_baselines(aa, bl_len_max, dish_size_in_lambda, obs_zen, times, uvbins, report=False):
@@ -154,7 +214,7 @@ def read_config(config_file):
     return prms
 
 
-def get_array_specs(calfile, bl_max, bl_min, freq, t_int=60.0, track=None, report=False):
+def get_array_specs(calfile, u_min, u_max, freq, t_int=60.0, track=None, report=False):
     prms = read_config(calfile)
     aa = arrdef.get_aa(np.array([0.150]), prms)
     prms = aa.get_arr_params()
@@ -189,3 +249,9 @@ def get_array_specs(calfile, bl_max, bl_min, freq, t_int=60.0, track=None, repor
     quadsum, uvsum = grid_baselines(aa, bl_len_max, dish_size_in_lambda, obs_zen, times, uvbins, report=report)
 
     return bl_len_max, bl_len_min, dish_size_in_lambda, obs_duration, prms, quadsum, uvsum
+
+
+def get_array_specs_uvd(config_file, u_min, u_max):
+    uvd = pyuvsim.initialize_uvdata_from_params(config_file)
+    uvbins = grid_baselines(uvd, u_min, u_max)
+

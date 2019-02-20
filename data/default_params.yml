@@ -1,0 +1,19 @@
+filing:
+  outdir: "./simulation_results/"   # TODO: probably don't need this
+  outfile_name: 'ref_1.1_uniform'   # TODO: or this
+freq:
+  Nfreqs: 1
+  channel_width: 80000.0
+  start_freq: 100000000.0
+sources: # TODO: or these
+  catalog: "catalog_files/mock_catalog_heratext_2458098.38824015.txt"
+telescope:
+  array_layout: dodgy_redundant_layout.csv
+  telescope_config_name: telescope_config.yml
+time:
+  Ntimes: 2
+  integration_time: 11.0
+  start_time: 2458098.38824015
+select:                    # limit which baselines are simulated. Use any UVData.select keywords (except polarizations) and/or redundant_threshold
+  redundant_threshold: 0.1 # redundancy threshold in meters. Only simulate one baseline per redundant group
+phase_type: drift

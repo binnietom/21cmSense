@@ -6,3 +6,9 @@ py21cmsense/__pycache__/
 py21cmsense\.egg-info/
 
 *.pyc
+
+hera127\.drift_mod_0\.135\.npz
+
+hera127drift_blmin0_blmax84_0\.135GHz_arrayfile\.npz
+
+hera127drift_moderate_0\.135\.npz
